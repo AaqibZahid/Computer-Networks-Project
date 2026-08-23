@@ -38,7 +38,7 @@ Auto Scaling Group → EC2 Instances  (Private Subnets)
    ↓
 CloudWatch (Monitoring, Alarms, Flow Logs)
 
-
+````
 ## 📦 What's Inside
 
 | Component | Details |
