@@ -1,1 +1,111 @@
 
+CLOUD NETWORKS PROJECT - NOTES
+Project: Cloud-based Networking for Facebook-class Webapps/Backends
+================================================================
+
+REGION: us-east-1 (N. Virginia)
+ACCOUNT: AWS Free Tier
+KEY PAIR: facebook-backend-key.pem (DO NOT commit this file to GitHub!)
+
+--- PHASE 1: SETUP ---
+- Created AWS account, enabled MFA
+- Set zero-spend billing alert
+- Region locked to us-east-1 for all resources
+- GitHub repo: cloud-networking-project
+
+--- PHASE 2: VPC & NETWORKING ---
+VPC: FacebookVPC | 10.0.0.0/16
+
+Subnets:
+  Public-Subnet-1   10.0.1.0/24   us-east-1a
+  Public-Subnet-2   10.0.2.0/24   us-east-1b
+  Private-Subnet-1  10.0.3.0/24   us-east-1a
+  Private-Subnet-2  10.0.4.0/24   us-east-1b
+
+Internet Gateway: FacebookVPC-IGW (attached)
+NAT Gateway: FacebookVPC-NAT (in Public-Subnet-1, has Elastic IP)
+
+Route Tables:
+  Public-RT  -> 0.0.0.0/0 -> IGW   (assoc: both public subnets)
+  Private-RT -> 0.0.0.0/0 -> NAT   (assoc: both private subnets)
+
+NOTE: accidentally had a second stray VPC created at one point (6-subnet
+one) - not used in final project, should double check it's deleted to
+avoid stray NAT Gateway charges.
+
+--- PHASE 3: COMPUTE ---
+App: simple Node.js HTTP server on port 3000, later upgraded to
+Facebook-style UI (blue theme, animated metric cards, auto-refresh 30s)
+
+EC2 instances: t3.micro x2 (t2.micro wasn't free-tier eligible for us,
+used t3.micro instead - same idea)
+  Backend-Server-1 -> Private-Subnet-1
+  Backend-Server-2 -> Private-Subnet-2
+(these were later terminated in favor of ASG-managed instances)
+
+Target Group: Backend-TG, HTTP:3000, health check path "/"
+
+ALB: Facebook-ALB, internet-facing, listens on :80, forwards to Backend-TG
+  DNS: Facebook-ALB-1354433057.us-east-1.elb.amazonaws.com
+
+Launch Template: Backend-Launch-Template (v1 = plain UI, v2 = FB-style UI)
+
+Auto Scaling Group: Backend-ASG
+  min=1 desired=2 max=4
+  target tracking: avg CPU 50%
+
+GOTCHA: after creating ASG we ended up with 4 running instances (2 manual
++ 2 from ASG) - terminated the manually-launched ones and let ASG own
+everything going forward.
+
+--- PHASE 4: SECURITY ---
+Security Groups:
+  ALB-SG      : in 80,443 from 0.0.0.0/0
+  Backend-SG  : in 3000 from ALB-SG only, 22 from my IP only
+  Database-SG : in 3306 from Backend-SG only (reserved, no DB deployed)
+
+NACLs:
+  Public-NACL  : allow 80,443,1024-65535 in/out -> assoc public subnets
+  Private-NACL : allow 3000 from public subnets, 22 from public subnet,
+                 1024-65535 return traffic -> assoc private subnets
+  (default VPC NACL still exists too, not deleted, just unused)
+
+VPC Flow Logs: FacebookVPC-FlowLogs -> CloudWatch Logs group
+  /aws/vpc/flowlogs
+  IAM role used: auto-generated VPCFlowLogs-Cloudwatch-<timestamp>
+  (the manually-created VPC-FlowLogs-Role wasn't showing up in the
+  dropdown right away - used the auto-generated one instead, works fine)
+
+Verified: direct access to private instance IP:3000 times out (correct -
+proves private subnet isolation is working)
+
+--- PHASE 5: CDN ---
+CloudFront distribution: Facebook_dist
+  Origin: ALB (HTTP only, port 80)
+  Viewer protocol: Redirect HTTP to HTTPS
+  Cache policy: CachingOptimized
+  Origin request policy: AllViewer
+  WAF: NOT enabled (costs ~$14/mo min, skipped for student project -
+       existing SG/NACL layers are the security story here)
+  Distribution domain: d________.cloudfront.net  <-- fill in actual value
+
+Verified caching: first load = x-cache: Miss from cloudfront
+                   second load = x-cache: Hit from cloudfront
+
+Did NOT set up a custom Route 53 domain - used default CloudFront domain
+to avoid buying a domain name.
+
+--- PHASE 6: MONITORING ---
+Dashboard: Facebook-Backend-Dashboard
+  widgets: CPU util, ALB request count, healthy/unhealthy hosts,
+           network in/out, ASG desired capacity
+
+Alarms (SNS topic: Backend-Alerts, email subscribed + confirmed):
+  High-CPU-Alert          CPUUtilization > 70%
+  Unhealthy-Targets-Alert UnHealthyHostCount > 0
+  High-Traffic-Alert      RequestCount > 1000/min
+
+Ran Log Insights queries against flow logs:
+  - top talkers by bytes
+  - REJECT filtered events
+  - traffic grouped by dstPort
