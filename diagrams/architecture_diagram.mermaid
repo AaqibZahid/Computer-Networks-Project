@@ -1,0 +1,45 @@
+flowchart TB
+    User["Internet Users"] --> CF["CloudFront CDN<br/>HTTPS, Global Edge Cache"]
+    CF --> ALB["Application Load Balancer<br/>Public Subnets"]
+
+    subgraph VPC["FacebookVPC 10.0.0.0/16"]
+        subgraph AZ1["us-east-1a"]
+            PUB1["Public-Subnet-1<br/>10.0.1.0/24"]
+            PRIV1["Private-Subnet-1<br/>10.0.3.0/24"]
+        end
+        subgraph AZ2["us-east-1b"]
+            PUB2["Public-Subnet-2<br/>10.0.2.0/24"]
+            PRIV2["Private-Subnet-2<br/>10.0.4.0/24"]
+        end
+        IGW["Internet Gateway"]
+        NAT["NAT Gateway"]
+        ALB
+        TG["Target Group<br/>Backend-TG :3000"]
+        ASG["Auto Scaling Group<br/>Min:1 Desired:2 Max:4"]
+        EC2A["EC2 Backend-1<br/>t3.micro"]
+        EC2B["EC2 Backend-2<br/>t3.micro"]
+    end
+
+    ALB --> TG
+    TG --> EC2A
+    TG --> EC2B
+    ASG -.manages.-> EC2A
+    ASG -.manages.-> EC2B
+    PUB1 --> IGW
+    PUB2 --> IGW
+    PUB1 --> NAT
+    NAT --> PRIV1
+    NAT --> PRIV2
+    EC2A -.-> PRIV1
+    EC2B -.-> PRIV2
+    ALB -.-> PUB1
+    ALB -.-> PUB2
+
+    CW["CloudWatch<br/>Dashboard + Alarms + Flow Logs"]
+    EC2A -.metrics.-> CW
+    EC2B -.metrics.-> CW
+    ALB -.metrics.-> CW
+
+    style CF fill:#1877f2,color:#fff
+    style ALB fill:#42b72a,color:#fff
+    style CW fill:#f7b731,color:#000
