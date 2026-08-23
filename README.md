@@ -4,7 +4,7 @@ A Computer Networks project simulating a scaled, secure cloud backend
 infrastructure — modeled on how large-scale platforms like Facebook
 structure their networking layer — built entirely on AWS.
 
-> 📄 Full report: [`Documentation/project_report.md`](./Documentation/project_report.md)
+> 📄 Full report: [`Documentation/project_report.pdf`](./Documentation/project_report.pdf)
 > 📝 Build notes: [`notes.txt`](./Notes.txt)
 
 ---
