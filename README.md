@@ -54,8 +54,7 @@ CloudWatch (Monitoring, Alarms, Flow Logs)
 
 ## 📊 Monitoring Dashboard
 
-<!-- PASTE SCREENSHOT HERE: Screenshots/Phase6-Monitoring/03-Complete-Dashboard.png -->
-![CloudWatch Dashboard](./Screenshots/Phase6-Monitoring/03-Complete-Dashboard.png)
+![CloudWatch Dashboard](./screenshots/Phase6-Monitoring/6.5.6-finished-dashboard.png)
 
 ---
 
